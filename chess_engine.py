@@ -13,19 +13,16 @@ from generate_training_set import get_dataset
 
 if __name__ == '__main__':
 
-
-    X, y = get_dataset(5000)
-
     # check for GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-    model = ChessModel(num_classes=num_classes).to(device)
+    model = ChessModel().to(device)
+    dataset = ChessDataset()
     
-    dataset = ChessDataset(X, y)
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 
-    loss_fn = torch.nn.CrossEntropyLoss()
+    # loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = torch.nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
     epochs = 50
@@ -36,9 +33,12 @@ if __name__ == '__main__':
 
         for inputs, labels in tqdm(dataloader):
             inputs, labels = inputs.to(device), labels.to(device)  # Move data to GPU
+            
             optimizer.zero_grad()
 
             outputs = model(inputs)
+
+            outputs = outputs.squeeze()
 
             loss = loss_fn(outputs, labels) # calculate loss
             loss.backward() # backward pass
