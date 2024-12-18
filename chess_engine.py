@@ -7,7 +7,6 @@ from torch.utils.data import DataLoader
 from model import ChessModel
 from chess_dataset import ChessDataset
 from tqdm import tqdm 
-from generate_training_set import get_dataset
 
 
 
@@ -53,7 +52,9 @@ if __name__ == '__main__':
         epoch_time = end_time - start_time
         minutes: int = int(epoch_time // 60)
         seconds: int = int(epoch_time) - minutes * 60
-        print(f'Epoch {epoch + 1 + 50}/{epochs + 1 + 50}, Loss: {running_loss / len(dataloader):.4f}, Time: {minutes}m{seconds}s')
+
+        # loss of each batch
+        print(f'Epoch {epoch + 1}/{epochs + 1 + 50}, Loss: {running_loss / len(dataloader):.4f}, Time: {minutes}m{seconds}s')
         
 
-
+    torch.save(model.state_dict(), "nets/value.pth")
