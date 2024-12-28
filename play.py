@@ -1,5 +1,6 @@
 from model import ChessModel
 import chess
+import chess.svg
 from state import State
 import torch
 
@@ -15,6 +16,8 @@ if __name__ == "__main__":
     model.load_state_dict(vals)
 
     s = State()
+
+        
 
     while not s.board.is_game_over():
         print("Move from: ", end="")
@@ -47,6 +50,7 @@ if __name__ == "__main__":
 
         best_move = min(chess_moves, key = chess_moves.get)
         s.board.push(best_move)
+        print(chess_moves[best_move])
         print(s.board)
 
         
