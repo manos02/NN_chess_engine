@@ -34,15 +34,20 @@ if __name__ == "__main__":
             continue
 
         print(s.board)
+        print()
 
+        chess_moves = {}
         for move in s.board.legal_moves: # turn of AI
             s.board.push(move)
             b = s.board_to_matrix()
             input_tensor = torch.tensor(b, dtype=torch.float32).unsqueeze(0)
             output = model(input_tensor)
-            print(float(output.data[0][0]))
+            chess_moves[move] = output
             s.board.pop()
 
+        best_move = min(chess_moves, key = chess_moves.get)
+        s.board.push(best_move)
+        print(s.board)
 
         
 
