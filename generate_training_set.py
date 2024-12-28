@@ -41,19 +41,20 @@ def get_dataset(target_num_samples=100000):
     Around 6 million games
     '''
 
-    data = pd.read_csv("chess_games.csv", nrows=10000) # change rows later  
+    data = pd.read_csv("chess_games.csv", nrows=20000) # change rows later  
     data = data[['White', 'Black', 'Result', 'WhiteElo', 'BlackElo', 'Termination', 'AN']]
     games = []
-
+    
     
     for row in data.loc[:, 'AN']: # iterate games column
-        
         pgn = io.StringIO(row)
         game = chess.pgn.read_game(pgn)
         games.append(game)
 
+    print("Finished fetching games from the dataset")
+
     # X position of the board during the game
-    # y next move from that position
+    # y the output of the game
     X, y = create_NN_input(games, target_num_samples)
 
     X = torch.tensor(X, dtype=torch.float32)
@@ -63,5 +64,5 @@ def get_dataset(target_num_samples=100000):
 
 
 if __name__ == "__main__":
-  X,y = get_dataset() # pass the number of samples
-  np.savez_compressed("dataset_100.npz", X, y)
+  X,y = get_dataset(1400000) # pass the number of samples, default 100 000 samples  
+  np.savez_compressed("dataset_5M.npz", X, y)

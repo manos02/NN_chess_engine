@@ -24,7 +24,7 @@ if __name__ == '__main__':
     loss_fn = torch.nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
-    epochs = 50
+    epochs = 20
     for epoch in range(epochs):  # loop over the dataset multiple times
         start_time = time.time()
         running_loss = 0.0
@@ -34,6 +34,7 @@ if __name__ == '__main__':
             inputs, labels = inputs.to(device), labels.to(device)  # Move data to GPU
             
             optimizer.zero_grad()
+
 
             outputs = model(inputs)
 
@@ -57,4 +58,4 @@ if __name__ == '__main__':
         print(f'Epoch {epoch + 1}/{epochs + 1 + 50}, Loss: {running_loss / len(dataloader):.4f}, Time: {minutes}m{seconds}s')
         
 
-    torch.save(model.state_dict(), "nets/value.pth")
+    torch.save(model.state_dict(), "nets/value1.pth")
