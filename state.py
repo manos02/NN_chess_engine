@@ -2,15 +2,6 @@ import chess
 import numpy as np
 
 
-
-# def encode_moves(moves):
-#     # create a 
-#     #  with move as the key, and an int as the value e.g np.str_('c5c7'): 0
-#     move_to_int = {move: idx for idx, move in enumerate(set(moves))}
-    
-#     # return the value for each move and the dictionary with the encoded moves
-#     return np.array([move_to_int[move] for move in moves], dtype=np.float32), move_to_int
-
 class State():
     
     def __init__(self, board=None):

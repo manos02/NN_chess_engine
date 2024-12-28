@@ -79,7 +79,7 @@ def ai_move(s, model):
         print("No legal moves available for AI.")
         return
 
-    best_move = min(chess_moves, key=chess_moves.get)
+    best_move = max(chess_moves, key=chess_moves.get)
     s.board.push(best_move)
     print(f"AI plays: {best_move}")
 
