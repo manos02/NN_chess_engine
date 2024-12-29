@@ -82,6 +82,7 @@ def main():
                 s, selected_square, ai_thinking = human_move(selected_square, square, s, ai_thinking)
             elif ai_thinking:
                 best_score, best_move = alphaBetaMax(3, s, -float("inf"), float("inf"), True, model) # update state
+                print(f"AI MOVE: {best_move}")
                 s.board.push(best_move)
                 ai_thinking = False
             

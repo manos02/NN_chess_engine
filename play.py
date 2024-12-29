@@ -1,5 +1,4 @@
 from model import ChessModel
-from state import State
 import torch
 import sys
 import chess
@@ -16,8 +15,24 @@ def load_model(path):
         print(f"Error loading AI model: {e}")
         sys.exit()
 
+def handcrafted_evaluate(s):
 
-def evaluate(s, model):
+    piece_values = {
+        chess.PAWN: 1,
+        chess.KNIGHT: 3,
+        chess.BISHOP: 3,
+        chess.ROOK: 5,
+        chess.QUEEN: 9,
+        chess.KING: 0  
+    }
+    
+    score = 0
+    for piece_type in piece_values:
+        score += len(s.board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
+        score -= len(s.board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
+    return score
+
+def model_evaluate(s, model):
     
     b = s.board_to_matrix()
     input_tensor = torch.tensor(b, dtype=torch.float32).unsqueeze(0)
@@ -25,6 +40,17 @@ def evaluate(s, model):
         output = model(input_tensor)
     
     return output.item()
+
+
+
+def combined_evaluate(s, model, weight_model=5.0, weight_handcrafted=0.5):
+
+    model_score = model_evaluate(s, model)
+    handcrafted_score = handcrafted_evaluate(s)
+    
+    combined_score = (weight_model * model_score) + (weight_handcrafted * handcrafted_score)
+    print(model_score, handcrafted_score)
+    return combined_score
 
 
 def human_move(selected_square, square, s, ai_thinking):
@@ -64,7 +90,7 @@ def human_move(selected_square, square, s, ai_thinking):
 
 def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model):
     if depth == 0 or s.board.is_game_over():
-        return evaluate(s, model), None
+        return combined_evaluate(s, model), None
 
     bestMove = None
     if maxPlayer: 
