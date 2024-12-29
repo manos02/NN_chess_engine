@@ -1,58 +1,106 @@
 from model import ChessModel
-import chess
-import chess.svg
 from state import State
 import torch
-
-PATH = "nets/value.pth"
-
-
-if __name__ == "__main__":
+import sys
+import chess
 
 
 
-    vals = torch.load(PATH, weights_only=True)
-    model = ChessModel()
-    model.load_state_dict(vals)
+def load_model(path):
+    try:
+        vals = torch.load(path, weights_only=True)
+        model = ChessModel()
+        model.load_state_dict(vals)
+        return model
+    except Exception as e:
+        print(f"Error loading AI model: {e}")
+        sys.exit()
 
-    s = State()
 
+def evaluate(s, model):
+    
+    b = s.board_to_matrix()
+    input_tensor = torch.tensor(b, dtype=torch.float32).unsqueeze(0)
+    with torch.no_grad():
+        output = model(input_tensor)
+    
+    return output.item()
+
+
+def human_move(selected_square, square, s, ai_thinking):
+    if selected_square is None:
+        piece = s.board.piece_at(square)
+        if piece and piece.color == chess.BLACK:
+            selected_square = square
+    else:
+        move = chess.Move(selected_square, square)
         
-
-    while not s.board.is_game_over():
-        print("Move from: ", end="")
-        from_square = input()
-        print("To: ", end="")
-        to_square = input()
-        try:
-            move = chess.Move.from_uci(from_square+to_square)
-        except:
-            print("The move is not valid") # if the squares are wrong
-            continue
-
         if move in s.board.legal_moves:
             s.board.push(move)
+            selected_square = None
+            ai_thinking = True
         else:
-            print("The move is not legal") # if the move is not valid
-            continue
+            print("Invalid move")
+            selected_square = None
+    return s, selected_square, ai_thinking
 
-        print(s.board)
-        print()
 
-        chess_moves = {}
-        for move in s.board.legal_moves: # turn of AI
+# int alphaBetaMax( int alpha, int beta, int depthleft ) {
+#    if ( depthleft == 0 ) return evaluate();
+#    bestValue = -infinity;
+#    for ( all moves) {
+#       score = alphaBetaMin( alpha, beta, depthleft - 1 );
+#       if( score > bestValue )
+#       {
+#          bestValue = alpha;
+#          if( score > alpha )
+#             alpha = score; // alpha acts like max in MiniMax
+#       }
+#       if( score >= beta )
+#          return score;   // fail soft beta-cutoff
+#    }
+#    return bestValue;
+# }
+
+def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model):
+    if depth == 0 or s.board.is_game_over():
+        return evaluate(s, model), None
+
+    bestMove = None
+    if maxPlayer: 
+        bestScore = -float('inf')
+        for move in s.board.legal_moves:
             s.board.push(move)
-            b = s.board_to_matrix()
-            input_tensor = torch.tensor(b, dtype=torch.float32).unsqueeze(0)
-            output = model(input_tensor)
-            chess_moves[move] = output
+            score, m = alphaBetaMax(depth-1, s, alpha, beta, False, model)
             s.board.pop()
+            
+            if score > bestScore:
+                bestScore = score   
+                bestMove = move         
+            if score > alpha:
+                alpha = score
+            if alpha >= beta:
+                break
+        return bestScore, bestMove
 
-        best_move = min(chess_moves, key = chess_moves.get)
-        s.board.push(best_move)
-        print(chess_moves[best_move])
-        print(s.board)
+    else:
+        bestScore = float('inf')
+        for move in s.board.legal_moves:
 
-        
+            s.board.push(move)
+            score, m = alphaBetaMax(depth-1, s, alpha, beta, True, model)
+            s.board.pop()
+            
+            if score < bestScore:
+                bestScore = score
+                bestMove = move
+            if score < beta:
+                beta = score
+            if alpha >= beta:
+                break
+
+        return bestScore, bestMove
 
     
+    
+

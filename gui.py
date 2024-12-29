@@ -1,9 +1,7 @@
 import pygame
 from state import State
-import sys
 import chess
-import torch
-from model import ChessModel
+from play import alphaBetaMax, load_model, human_move
 
 
 # pygame setup
@@ -62,41 +60,6 @@ def draw_pieces(screen, board):
                 screen.blit(piece_image, pygame.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
-def ai_move(s, model):
-    chess_moves = {}
-    print(s.board.legal_moves)
-    for move in s.board.legal_moves:
-        s.board.push(move)
-        b = s.board_to_matrix()
-        input_tensor = torch.tensor(b, dtype=torch.float32).unsqueeze(0)
-        with torch.no_grad():
-            output = model(input_tensor)
-        chess_moves[move] = output.item()
-        s.board.pop()
-
-    
-    if not chess_moves:
-        print("No legal moves available for AI.")
-        return
-
-    best_move = max(chess_moves, key=chess_moves.get)
-    s.board.push(best_move)
-    print(f"AI plays: {best_move}")
-
-    return s
-    
-
-
-def load_model(path):
-    try:
-        vals = torch.load(path, weights_only=True)
-        model = ChessModel()
-        model.load_state_dict(vals)
-        return model
-    except Exception as e:
-        print(f"Error loading AI model: {e}")
-        sys.exit()
-
 def main():
 
     model = load_model("nets/value.pth") # load ai model
@@ -104,37 +67,23 @@ def main():
     s = State()
     running = True
     selected_square = None
-    AI_THINKING = True
+    ai_thinking = True
 
 
     while running:
-        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN and not AI_THINKING:
+            elif event.type == pygame.MOUSEBUTTONDOWN and not ai_thinking:
                 location = pygame.mouse.get_pos()  # (x, y)
                 col = location[0] // SQ_SIZE
                 row = location[1] // SQ_SIZE
                 square = chess.square(col, 7 - row)  # Convert to chess square
-                if selected_square is None:
-                    piece = s.board.piece_at(square)
-                    if piece and piece.color == chess.BLACK:
-                        selected_square = square
-                else:
-                    move = chess.Move(selected_square, square)
-                    
-                    if move in s.board.legal_moves:
-                        s.board.push(move)
-                        selected_square = None
-                        AI_THINKING = True
-                    else:
-                        print("Invalid move")
-                        selected_square = None
-            elif AI_THINKING:
-                s = ai_move(s, model) # update state
-                AI_THINKING = False
-                
+                s, selected_square, ai_thinking = human_move(selected_square, square, s, ai_thinking)
+            elif ai_thinking:
+                best_score, best_move = alphaBetaMax(3, s, -float("inf"), float("inf"), True, model) # update state
+                s.board.push(best_move)
+                ai_thinking = False
             
         draw_board(screen)
         draw_pieces(screen, s.board)
