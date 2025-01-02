@@ -52,22 +52,30 @@ def combined_evaluate(s, model):
     return combined_score
 
 
-def human_move(selected_square, square, s, ai_thinking):
+def human_move(selected_square, square, s):
     if selected_square is None:
         piece = s.board.piece_at(square)
         if piece and piece.color == chess.BLACK:
             selected_square = square
+        return s, selected_square, False, None 
     else:
-        move = chess.Move(selected_square, square)
-        
+        move = chess.Move(selected_square, square)       
+        if chess.square_rank(square) == 0 and s.board.piece_at(selected_square).symbol() == 'p': # if promotion square
+            pieces_to_nums = {"q":5, "k":2, "r":4, "b":3}
+            while True:
+                print("Promote to: q (Queen), k (Knight), b (Bishop), r (Rook)")
+                ans = input()
+                if ans in "qkbr":
+                    move = chess.Move(selected_square, square, pieces_to_nums[ans])
+                    print(move)
+                    break
+
         if move in s.board.legal_moves:
             s.board.push(move)
-            selected_square = None
-            ai_thinking = True
+            return s, None, True, move
         else:
             print("Invalid move")
-            selected_square = None
-    return s, selected_square, ai_thinking
+            return s, None, False, None
 
 
 # int alphaBetaMax( int alpha, int beta, int depthleft ) {
