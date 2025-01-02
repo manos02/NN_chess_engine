@@ -43,13 +43,12 @@ def model_evaluate(s, model):
 
 
 
-def combined_evaluate(s, model, weight_model=5.0, weight_handcrafted=0.5):
+def combined_evaluate(s, model):
 
     model_score = model_evaluate(s, model)
     handcrafted_score = handcrafted_evaluate(s)
     
-    combined_score = (weight_model * model_score) + (weight_handcrafted * handcrafted_score)
-    print(model_score, handcrafted_score)
+    combined_score = model_score + handcrafted_score
     return combined_score
 
 

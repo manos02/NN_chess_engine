@@ -9,7 +9,6 @@ from chess_dataset import ChessDataset
 from tqdm import tqdm 
 
 
-
 if __name__ == '__main__':
 
     # check for GPU
@@ -34,12 +33,8 @@ if __name__ == '__main__':
             inputs, labels = inputs.to(device), labels.to(device)  # Move data to GPU
             
             optimizer.zero_grad()
-
-
             outputs = model(inputs)
-
             outputs = outputs.squeeze()
-
             loss = loss_fn(outputs, labels) # calculate loss
             loss.backward() # backward pass
 

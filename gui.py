@@ -61,7 +61,6 @@ def draw_pieces(screen, board):
 
 
 def main():
-
     model = load_model("nets/value.pth") # load ai model
     load_images() # load the images for the gui
     s = State()
