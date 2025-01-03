@@ -4,7 +4,7 @@ A chess engine built using an evaluation function that is a combination of a neu
 
 
 
-![](GUI.png)
+![](images/GUI.png)
 
 ## Features
 
