@@ -8,7 +8,7 @@ A chess engine built using an evaluation function that is a combination of a neu
 
 ## Features
 
-- **Board Representation**: Converts the chess board state into a 14-layered matrix, see board.py for more information.
+- **Board Representation**: Converts the chess board state into a 14-layered matrix, see state.py for more information.
 - **Move Generation**: Identifies and encodes all legal moves available in the current board state.
 - **Castling and En Passant Handling**: Tracks castling rights and en passant possibilities.
 - **Check Detection**: Determines if the current player is in check.
