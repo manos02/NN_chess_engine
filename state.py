@@ -6,7 +6,7 @@ class State():
     
     def __init__(self, board=None):
         if board is None:
-            self.board = chess.Board("k7/8/8/8/8/8/4q3/7K w - - 0 1")
+            self.board = chess.Board()
         else:
             self.board = board
 

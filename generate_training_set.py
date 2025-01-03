@@ -63,6 +63,8 @@ def get_dataset(target_num_samples=100000):
     return X,y
 
 
+
 if __name__ == "__main__":
-  X,y = get_dataset(1400000) # pass the number of samples, default 100 000 samples  
-  np.savez_compressed("dataset_5M.npz", X, y)
+  num_samples = 1400000
+  X,y = get_dataset(num_samples) # pass the number of samples, default 100 000 samples  
+  np.savez_compressed(f"dataset_{num_samples}.npz", X, y)

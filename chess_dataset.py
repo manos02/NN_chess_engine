@@ -4,7 +4,7 @@ import numpy as np
 class ChessDataset(Dataset):
 
     def __init__(self):
-        d = np.load('dataset_5M.npz')
+        d = np.load('dataset_1400000.npz')
         self.X = d['arr_0']
         self.y = d['arr_1']
 
