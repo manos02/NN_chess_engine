@@ -3,9 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-*npz
-nets
+
 .DS_Store
+*npz
 
 *.csv
 # C extensions
