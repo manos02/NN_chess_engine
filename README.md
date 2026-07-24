@@ -19,7 +19,7 @@ A chess engine built using an evaluation function that is a combination of a neu
 
    ```bash
    git clone git@github.com:manos02/NN_chess_engine.git
-   cd chess-engine
+   cd NN_chess_engine
    ```
 
 2. **Create a Virtual Environment**
