@@ -52,15 +52,17 @@ def combined_evaluate(s, model):
     return combined_score
 
 
-def human_move(selected_square, square, s):
+def human_move(selected_square, square, s, human_color=chess.BLACK):
     if selected_square is None:
         piece = s.board.piece_at(square)
-        if piece and piece.color == chess.BLACK:
+        if piece and piece.color == human_color:
             selected_square = square
-        return s, selected_square, False, None 
+        return s, selected_square, False, None
     else:
-        move = chess.Move(selected_square, square)       
-        if chess.square_rank(square) == 0 and s.board.piece_at(selected_square).symbol() == 'p': # if promotion square
+        move = chess.Move(selected_square, square)
+        promotion_rank = 7 if human_color == chess.WHITE else 0
+        piece = s.board.piece_at(selected_square)
+        if chess.square_rank(square) == promotion_rank and piece is not None and piece.piece_type == chess.PAWN: # if promotion square
             pieces_to_nums = {"q":5, "k":2, "r":4, "b":3}
             while True:
                 print("Promote to: q (Queen), k (Knight), b (Bishop), r (Rook)")
