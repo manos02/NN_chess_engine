@@ -1,11 +1,17 @@
+import argparse
 import threading
 
+import numpy as np
 import pygame
 from state import State
 import chess
 from play import alphaBetaMax, load_model, human_move
 
 # pygame setup
+try:
+    pygame.mixer.pre_init(44100, -16, 1, 512)
+except pygame.error:
+    pass
 pygame.init()
 
 # Constants
@@ -34,8 +40,39 @@ PIECES_TO_IMAGES = {
     'k': 'bk'   # Black King
 }
 
+LIGHT_SQ = pygame.Color("#f0d9b5")
+DARK_SQ = pygame.Color("#b58863")
+HIGHLIGHT = (246, 216, 92, 110)     # last move / selection wash
+DOT_COLOR = (20, 20, 20, 70)        # legal move markers
+
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
+
+SOUND_ON = True
+SOUNDS = {}
+
+# Synthesize a short percussive click so the repo needs no audio assets
+def make_sound(freq, ms=90):
+    rate = 44100
+    n = int(rate * ms / 1000)
+    t = np.arange(n) / rate
+    envelope = np.exp(-t * 38)
+    wave = np.sin(2 * np.pi * freq * t) * envelope * 0.35
+    return pygame.sndarray.make_sound((wave * 32767).astype(np.int16))
+
+def load_sounds():
+    if not pygame.mixer.get_init():
+        return
+    SOUNDS["move"] = make_sound(660)
+    SOUNDS["capture"] = make_sound(320, 130)
+
+def play_sound(board, move):
+    if not SOUND_ON or not SOUNDS or move is None:
+        return
+    # board is the position *after* the move was pushed, so step back to classify it
+    before = board.copy()
+    before.pop()
+    SOUNDS["capture" if before.is_capture(move) else "move"].play()
 
 # Convert a chess square to (col, row) on screen, given the board orientation
 def square_to_screen(square, flipped):
@@ -52,30 +89,42 @@ def screen_to_square(col, row, flipped):
     return chess.square(col, 7 - row)
 
 # Draw the chessboard
-def draw_board(screen, selected_square, last_move, flipped):
+def draw_board(screen, board, selected_square, last_move, flipped):
 
-    last_move_color_from = pygame.Color("blue")    # Color for source square
-    last_move_color_to = pygame.Color("red")
-
-    colors = [pygame.Color("white"), pygame.Color("gray")]
+    colors = [LIGHT_SQ, DARK_SQ]
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             color = colors[(r + c) % 2]
             pygame.draw.rect(screen, color, pygame.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
-    if selected_square is not None:
-            col, row = square_to_screen(selected_square, flipped)
-            pygame.draw.rect(screen, last_move_color_from, pygame.Rect(col*SQ_SIZE, row*SQ_SIZE, SQ_SIZE, SQ_SIZE), 4)
-
-    # Highlight the last move's source and destination squares
+    # Soft wash over the last move's source and destination squares
     if last_move is not None:
-        # Highlight source square
-        col_from, row_from = square_to_screen(last_move.from_square, flipped)
-        pygame.draw.rect(screen, last_move_color_from, pygame.Rect(col_from*SQ_SIZE, row_from*SQ_SIZE, SQ_SIZE, SQ_SIZE), 4)
+        wash = pygame.Surface((SQ_SIZE, SQ_SIZE), pygame.SRCALPHA)
+        wash.fill(HIGHLIGHT)
+        for square in (last_move.from_square, last_move.to_square):
+            col, row = square_to_screen(square, flipped)
+            screen.blit(wash, (col*SQ_SIZE, row*SQ_SIZE))
 
-        # Highlight destination square
-        col_to, row_to = square_to_screen(last_move.to_square, flipped)
-        pygame.draw.rect(screen, last_move_color_to, pygame.Rect(col_to*SQ_SIZE, row_to*SQ_SIZE, SQ_SIZE, SQ_SIZE), 4)
+    if selected_square is not None:
+        col, row = square_to_screen(selected_square, flipped)
+        selection = pygame.Surface((SQ_SIZE, SQ_SIZE), pygame.SRCALPHA)
+        selection.fill(HIGHLIGHT)
+        screen.blit(selection, (col*SQ_SIZE, row*SQ_SIZE))
+        draw_move_hints(screen, board, selected_square, flipped)
+
+# Dots on empty targets, rings around capturable pieces
+def draw_move_hints(screen, board, from_square, flipped):
+    hints = pygame.Surface((BOARD_SIZE, BOARD_SIZE), pygame.SRCALPHA)
+    for move in board.legal_moves:
+        if move.from_square != from_square:
+            continue
+        col, row = square_to_screen(move.to_square, flipped)
+        center = (col*SQ_SIZE + SQ_SIZE//2, row*SQ_SIZE + SQ_SIZE//2)
+        if board.piece_at(move.to_square) is None:
+            pygame.draw.circle(hints, DOT_COLOR, center, SQ_SIZE//7)
+        else:
+            pygame.draw.circle(hints, DOT_COLOR, center, SQ_SIZE//2 - 4, 6)
+    screen.blit(hints, (0, 0))
 
 # Load images
 def load_images():
@@ -163,6 +212,21 @@ def draw_panel(screen, board, human_color, score, thinking):
     if thinking:
         draw_text_left(screen, "AI thinking...", 26, (x, HEIGHT - 60), pygame.Color("gold"))
 
+    return draw_toggle(screen, "Sound", SOUND_ON, (x, HEIGHT - 130))
+
+# Small on/off toggle, returns its clickable rect
+def draw_toggle(screen, label, on, topleft):
+    rect = pygame.Rect(topleft[0], topleft[1], PANEL_WIDTH - 40, 44)
+    pygame.draw.rect(screen, pygame.Color("gray25"), rect, border_radius=6)
+    pygame.draw.rect(screen, pygame.Color("gray50"), rect, 2, border_radius=6)
+    draw_text_left(screen, label, 24, (rect.x + 12, rect.y + 10))
+    state = "ON" if on else "OFF"
+    color = pygame.Color("palegreen") if on else pygame.Color("gray60")
+    font = pygame.font.SysFont("Arial", 24, bold=True)
+    surface = font.render(state, True, color)
+    screen.blit(surface, surface.get_rect(midright=(rect.right - 12, rect.centery)))
+    return rect
+
 # Start screen: pick a side. Returns chess.WHITE / chess.BLACK, or None if the window was closed.
 def choose_color(screen):
     while True:
@@ -219,16 +283,17 @@ def game_over_popup(screen, board, draw_game):
 
 
 # Run the search in a background thread on a copy of the board, so the window stays responsive
-def start_search(model, board, ai_is_white, result):
+def start_search(model, board, ai_is_white, result, depth):
     def run():
-        result.append(alphaBetaMax(3, State(board.copy()), -float("inf"), float("inf"), ai_is_white, model))
+        result.append(alphaBetaMax(depth, State(board.copy()), -float("inf"), float("inf"), ai_is_white, model))
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
     return thread
 
 
 # Play a single game. Returns True to play again, False to quit.
-def play_game(model, human_color, score):
+def play_game(model, human_color, score, depth):
+    global SOUND_ON
     s = State()
     flipped = (human_color == chess.BLACK)  # keep the human's pieces at the bottom
     ai_is_white = (human_color == chess.BLACK)  # the AI maximizes when it plays white
@@ -238,15 +303,20 @@ def play_game(model, human_color, score):
     selected_square = None
     last_move = None
 
+    sound_rect = pygame.Rect(0, 0, 0, 0)
+
     def draw_game():
-        draw_board(screen, selected_square, last_move, flipped)
+        nonlocal sound_rect
+        draw_board(screen, s.board, selected_square, last_move, flipped)
         draw_pieces(screen, s.board, flipped)
-        draw_panel(screen, s.board, human_color, score, ai_thinking)
+        sound_rect = draw_panel(screen, s.board, human_color, score, ai_thinking)
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
+            elif event.type == pygame.MOUSEBUTTONDOWN and sound_rect.collidepoint(event.pos):
+                SOUND_ON = not SOUND_ON
             elif event.type == pygame.MOUSEBUTTONDOWN and not ai_thinking and event.pos[0] < BOARD_SIZE:
                 col = event.pos[0] // SQ_SIZE
                 row = event.pos[1] // SQ_SIZE
@@ -254,16 +324,18 @@ def play_game(model, human_color, score):
                 s, selected_square, ai_thinking, move = human_move(selected_square, square, s, human_color)
                 if move is not None:
                     last_move = move
+                    play_sound(s.board, move)
 
         if ai_thinking and ai_thread is None and not s.board.is_game_over():
             ai_result = []
-            ai_thread = start_search(model, s.board, ai_is_white, ai_result)
+            ai_thread = start_search(model, s.board, ai_is_white, ai_result, depth)
 
         if ai_thread is not None and not ai_thread.is_alive():
             best_score, best_move = ai_result[0]
             print(f"AI MOVE: {best_move}")
             s.board.push(best_move)
             last_move = best_move
+            play_sound(s.board, best_move)
             ai_thinking = False
             ai_thread = None
 
@@ -291,15 +363,20 @@ def update_score(board, human_color, score):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--depth", type=int, default=3, help="AI search depth (default: 3)")
+    args = parser.parse_args()
+
     model = load_model("nets/value.pth") # load ai model
     load_images() # load the images for the gui
+    load_sounds() # move/capture sounds, synthesized at startup
     score = {"human": 0, "ai": 0, "draws": 0}
 
     while True:
         human_color = choose_color(screen)
         if human_color is None:
             break
-        if not play_game(model, human_color, score):
+        if not play_game(model, human_color, score, args.depth):
             break
 
     pygame.quit()
