@@ -15,6 +15,9 @@ def load_model(path):
         print(f"Error loading AI model: {e}")
         sys.exit()
 
+# Well above any material/model score, so a mate always outweighs material
+MATE_SCORE = 10000
+
 def handcrafted_evaluate(s):
 
     piece_values = {
@@ -88,7 +91,15 @@ def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model, is_root=False):
         if s.board.is_repetition(2) or s.board.can_claim_fifty_moves():
             return 0, None
 
-    if depth == 0 or s.board.is_game_over():
+    if s.board.is_game_over():
+        if s.board.is_checkmate():
+            # White-relative, like the rest of the evaluation. `depth` is the depth
+            # left to search, so shallower mates score higher and get played first.
+            score = MATE_SCORE + depth
+            return -score if s.board.turn == chess.WHITE else score, None
+        return 0, None  # stalemate, insufficient material, fivefold, 75-move
+
+    if depth == 0:
         return combined_evaluate(s, model), None
 
     bestMove = None
