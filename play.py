@@ -18,21 +18,20 @@ def load_model(path):
 # Well above any material/model score, so a mate always outweighs material
 MATE_SCORE = 10000
 
-def handcrafted_evaluate(s):
+PIECE_VALUES = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+    chess.KING: 0
+}
 
-    piece_values = {
-        chess.PAWN: 1,
-        chess.KNIGHT: 3,
-        chess.BISHOP: 3,
-        chess.ROOK: 5,
-        chess.QUEEN: 9,
-        chess.KING: 0  
-    }
-    
+def handcrafted_evaluate(s):
     score = 0
-    for piece_type in piece_values:
-        score += len(s.board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
-        score -= len(s.board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
+    for piece_type in PIECE_VALUES:
+        score += len(s.board.pieces(piece_type, chess.WHITE)) * PIECE_VALUES[piece_type]
+        score -= len(s.board.pieces(piece_type, chess.BLACK)) * PIECE_VALUES[piece_type]
     return score
 
 def model_evaluate(s, model):
@@ -52,6 +51,62 @@ def combined_evaluate(s, model):
     
     combined_score = model_score + handcrafted_score
     return combined_score
+
+
+# MVV-LVA: grabbing a big piece with a small one is the most promising try, so
+# searching those first makes alpha-beta cut off far more of the tree.
+def move_score(board, move):
+    score = 0
+    if board.is_capture(move):
+        victim = board.piece_at(move.to_square)
+        # en passant leaves the target square empty; the victim is always a pawn
+        victim_value = PIECE_VALUES[victim.piece_type] if victim else PIECE_VALUES[chess.PAWN]
+        attacker_value = PIECE_VALUES[board.piece_at(move.from_square).piece_type]
+        score += 10 * victim_value - attacker_value + 100
+    if move.promotion:
+        score += PIECE_VALUES[move.promotion]
+    return score
+
+def ordered_moves(board, captures_only=False):
+    moves = [m for m in board.legal_moves if not captures_only or board.is_capture(m)]
+    moves.sort(key=lambda m: move_score(board, m), reverse=True)
+    return moves
+
+
+# Keep searching captures past the nominal depth until the position is quiet, so
+# leaves are never scored in the middle of a trade (the horizon effect).
+def quiesce(s, alpha, beta, maxPlayer, model):
+    if s.board.is_checkmate():
+        score = MATE_SCORE
+        return -score if s.board.turn == chess.WHITE else score
+    if s.board.is_stalemate():
+        return 0
+
+    # The side to move is not obliged to capture, so its static score is a floor
+    # (a ceiling when minimizing) that any capture has to beat.
+    stand_pat = combined_evaluate(s, model)
+    if maxPlayer:
+        if stand_pat >= beta:
+            return stand_pat
+        alpha = max(alpha, stand_pat)
+    else:
+        if stand_pat <= alpha:
+            return stand_pat
+        beta = min(beta, stand_pat)
+
+    for move in ordered_moves(s.board, captures_only=True):
+        s.board.push(move)
+        score = quiesce(s, alpha, beta, not maxPlayer, model)
+        s.board.pop()
+
+        if maxPlayer:
+            alpha = max(alpha, score)
+        else:
+            beta = min(beta, score)
+        if alpha >= beta:
+            break
+
+    return alpha if maxPlayer else beta
 
 
 # Returns (state, selected_square, ai_to_move, move, needs_promotion).
@@ -100,12 +155,12 @@ def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model, is_root=False):
         return 0, None  # stalemate, insufficient material, fivefold, 75-move
 
     if depth == 0:
-        return combined_evaluate(s, model), None
+        return quiesce(s, alpha, beta, maxPlayer, model), None
 
     bestMove = None
-    if maxPlayer: 
+    if maxPlayer:
         bestScore = -float('inf')
-        for move in s.board.legal_moves:
+        for move in ordered_moves(s.board):
             s.board.push(move)
             score, m = alphaBetaMax(depth-1, s, alpha, beta, False, model)
             s.board.pop()
@@ -121,8 +176,7 @@ def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model, is_root=False):
 
     else:
         bestScore = float('inf')
-        for move in s.board.legal_moves:
-
+        for move in ordered_moves(s.board):
             s.board.push(move)
             score, m = alphaBetaMax(depth-1, s, alpha, beta, True, model)
             s.board.pop()
