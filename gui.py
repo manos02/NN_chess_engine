@@ -145,6 +145,24 @@ def draw_pieces(screen, board, flipped):
             screen.blit(piece_image, pygame.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
+PROMO_PIECES = (chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT)
+
+# Squares of the promotion picker, stacked away from the board edge
+def promotion_rects(to_square, flipped):
+    col, row = square_to_screen(to_square, flipped)
+    step = 1 if row <= 3 else -1
+    return [(pygame.Rect(col*SQ_SIZE, (row + i*step)*SQ_SIZE, SQ_SIZE, SQ_SIZE), piece)
+            for i, piece in enumerate(PROMO_PIECES)]
+
+def draw_promotion(screen, rects, color):
+    shade = pygame.Surface((BOARD_SIZE, BOARD_SIZE), pygame.SRCALPHA)
+    shade.fill((0, 0, 0, 130))
+    screen.blit(shade, (0, 0))
+    for rect, piece_type in rects:
+        pygame.draw.rect(screen, pygame.Color("gray95"), rect)
+        pygame.draw.rect(screen, pygame.Color("gray40"), rect, 2)
+        screen.blit(IMAGES[PIECES_TO_IMAGES[chess.Piece(piece_type, color).symbol()]], rect)
+
 # Draw a centered text label, returns its rect
 def draw_text(screen, text, size, center, color=pygame.Color("white")):
     font = pygame.font.SysFont("Arial", size, bold=True)
@@ -304,11 +322,14 @@ def play_game(model, human_color, score, depth):
     last_move = None
 
     sound_rect = pygame.Rect(0, 0, 0, 0)
+    promotion_square = None  # destination of a promotion waiting on a piece choice
 
     def draw_game():
         nonlocal sound_rect
         draw_board(screen, s.board, selected_square, last_move, flipped)
         draw_pieces(screen, s.board, flipped)
+        if promotion_square is not None:
+            draw_promotion(screen, promotion_rects(promotion_square, flipped), human_color)
         sound_rect = draw_panel(screen, s.board, human_color, score, ai_thinking)
 
     while True:
@@ -317,11 +338,26 @@ def play_game(model, human_color, score, depth):
                 return False
             elif event.type == pygame.MOUSEBUTTONDOWN and sound_rect.collidepoint(event.pos):
                 SOUND_ON = not SOUND_ON
+            elif event.type == pygame.MOUSEBUTTONDOWN and promotion_square is not None:
+                # only the picker is live: pick a piece, or click away to cancel
+                promotion = next((p for rect, p in promotion_rects(promotion_square, flipped)
+                                  if rect.collidepoint(event.pos)), None)
+                if promotion is None:
+                    promotion_square, selected_square = None, None
+                else:
+                    s, selected_square, ai_thinking, move, _ = human_move(
+                        selected_square, promotion_square, s, human_color, promotion)
+                    promotion_square = None
+                    if move is not None:
+                        last_move = move
+                        play_sound(s.board, move)
             elif event.type == pygame.MOUSEBUTTONDOWN and not ai_thinking and event.pos[0] < BOARD_SIZE:
                 col = event.pos[0] // SQ_SIZE
                 row = event.pos[1] // SQ_SIZE
                 square = screen_to_square(col, row, flipped)
-                s, selected_square, ai_thinking, move = human_move(selected_square, square, s, human_color)
+                s, selected_square, ai_thinking, move, needs_promotion = human_move(selected_square, square, s, human_color)
+                if needs_promotion:
+                    promotion_square = square
                 if move is not None:
                     last_move = move
                     play_sound(s.board, move)

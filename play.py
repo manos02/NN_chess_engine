@@ -33,7 +33,6 @@ def handcrafted_evaluate(s):
     return score
 
 def model_evaluate(s, model):
-    
     b = s.board_to_matrix()
     input_tensor = torch.tensor(b, dtype=torch.float32).unsqueeze(0)
     with torch.no_grad():
@@ -52,51 +51,35 @@ def combined_evaluate(s, model):
     return combined_score
 
 
-def human_move(selected_square, square, s, human_color=chess.BLACK):
+# Returns (state, selected_square, ai_to_move, move, needs_promotion).
+# needs_promotion is True when the click is a legal promotion but no piece was
+# chosen yet; the caller should ask the user and call again with `promotion`.
+def human_move(selected_square, square, s, human_color=chess.BLACK, promotion=None):
     if selected_square is None:
         piece = s.board.piece_at(square)
         if piece and piece.color == human_color:
             selected_square = square
-        return s, selected_square, False, None
+        return s, selected_square, False, None, False
     else:
         move = chess.Move(selected_square, square)
         promotion_rank = 7 if human_color == chess.WHITE else 0
         piece = s.board.piece_at(selected_square)
         if chess.square_rank(square) == promotion_rank and piece is not None and piece.piece_type == chess.PAWN: # if promotion square
-            pieces_to_nums = {"q":5, "k":2, "r":4, "b":3}
-            while True:
-                print("Promote to: q (Queen), k (Knight), b (Bishop), r (Rook)")
-                ans = input()
-                if ans in "qkbr":
-                    move = chess.Move(selected_square, square, pieces_to_nums[ans])
-                    print(move)
-                    break
+            if promotion is None:
+                if chess.Move(selected_square, square, chess.QUEEN) in s.board.legal_moves:
+                    return s, selected_square, False, None, True
+            else:
+                move = chess.Move(selected_square, square, promotion)
 
         if move in s.board.legal_moves:
             s.board.push(move)
-            return s, None, True, move
+            return s, None, True, move, False
         else:
             print("Invalid move")
-            return s, None, False, None
+            return s, None, False, None, False
 
 
-# int alphaBetaMax( int alpha, int beta, int depthleft ) {
-#    if ( depthleft == 0 ) return evaluate();
-#    bestValue = -infinity;
-#    for ( all moves) {
-#       score = alphaBetaMin( alpha, beta, depthleft - 1 );
-#       if( score > bestValue )
-#       {
-#          bestValue = alpha;
-#          if( score > alpha )
-#             alpha = score; // alpha acts like max in MiniMax
-#       }
-#       if( score >= beta )
-#          return score;   // fail soft beta-cutoff
-#    }
-#    return bestValue;
-# }
-
+# https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning
 def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model):
     if depth == 0 or s.board.is_game_over():
         return combined_evaluate(s, model), None
