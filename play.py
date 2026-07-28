@@ -80,7 +80,14 @@ def human_move(selected_square, square, s, human_color=chess.BLACK, promotion=No
 
 
 # https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning
-def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model):
+def alphaBetaMax(depth, s, alpha, beta, maxPlayer, model, is_root=False):
+    # Score a repeated position as a draw so the engine stops shuffling. Skipped at
+    # the root, which must always return a move, and when no reversible move has
+    # been made yet (a repetition is impossible then).
+    if not is_root and s.board.halfmove_clock >= 4:
+        if s.board.is_repetition(2) or s.board.can_claim_fifty_moves():
+            return 0, None
+
     if depth == 0 or s.board.is_game_over():
         return combined_evaluate(s, model), None
 

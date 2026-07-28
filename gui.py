@@ -266,7 +266,7 @@ def choose_color(screen):
 
 # Text describing how the game ended
 def result_text(board):
-    outcome = board.outcome()
+    outcome = board.outcome(claim_draw=True)
     if outcome is None:
         return "Game over"
     if outcome.winner is None:
@@ -284,7 +284,7 @@ def game_over_popup(screen, board, draw_game):
 
         draw_text(screen, "Game Over", 60, (WIDTH//2, HEIGHT//3 - 40))
         draw_text(screen, result_text(board), 32, (WIDTH//2, HEIGHT//3 + 30))
-        draw_text(screen, f"Result: {board.result()}", 28, (WIDTH//2, HEIGHT//3 + 80))
+        draw_text(screen, f"Result: {board.result(claim_draw=True)}", 28, (WIDTH//2, HEIGHT//3 + 80))
         again_rect = draw_button(screen, "Play Again", (WIDTH//2 - 140, HEIGHT//2 + 100))
         quit_rect = draw_button(screen, "Quit", (WIDTH//2 + 140, HEIGHT//2 + 100))
         pygame.display.flip()
@@ -303,7 +303,7 @@ def game_over_popup(screen, board, draw_game):
 # Run the search in a background thread on a copy of the board, so the window stays responsive
 def start_search(model, board, ai_is_white, result, depth):
     def run():
-        result.append(alphaBetaMax(depth, State(board.copy()), -float("inf"), float("inf"), ai_is_white, model))
+        result.append(alphaBetaMax(depth, State(board.copy()), -float("inf"), float("inf"), ai_is_white, model, is_root=True))
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
     return thread
@@ -362,7 +362,7 @@ def play_game(model, human_color, score, depth):
                     last_move = move
                     play_sound(s.board, move)
 
-        if ai_thinking and ai_thread is None and not s.board.is_game_over():
+        if ai_thinking and ai_thread is None and not s.board.is_game_over(claim_draw=True):
             ai_result = []
             ai_thread = start_search(model, s.board, ai_is_white, ai_result, depth)
 
@@ -377,9 +377,9 @@ def play_game(model, human_color, score, depth):
 
         draw_game()
 
-        if s.board.is_game_over():
+        if s.board.is_game_over(claim_draw=True):
             print("GAME OVER")
-            print("RESULT: ", s.board.result())
+            print("RESULT: ", s.board.result(claim_draw=True))
             update_score(s.board, human_color, score)
             return game_over_popup(screen, s.board, draw_game)
 
@@ -389,7 +389,8 @@ def play_game(model, human_color, score, depth):
 
 # Add the finished game to the running match score
 def update_score(board, human_color, score):
-    winner = board.outcome().winner if board.outcome() else None
+    outcome = board.outcome(claim_draw=True)
+    winner = outcome.winner if outcome else None
     if winner is None:
         score["draws"] += 1
     elif winner == human_color:
